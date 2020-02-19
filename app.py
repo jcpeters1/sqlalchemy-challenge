@@ -1,5 +1,7 @@
 import numpy as np
 
+import datetime as dt
+
 import sqlalchemy
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
@@ -43,17 +45,16 @@ def precipitation():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    results = session.query(Passenger.name, Passenger.age, Passenger.sex).all()
+    results = session.query(Measurement.date, Measurement.prcp).all()
 
     session.close()
 
     all_prcp = []
-    for name, age, sex in results:
-        passenger_dict = {}
-        passenger_dict["name"] = name
-        passenger_dict["age"] = age
-        passenger_dict["sex"] = sex
-        all_passengers.append(passenger_dict)
+
+    for date, prcp in results:
+        prcp_dict = {}
+        prcp_dict[date] = prcp
+        all_prcp.append(prcp_dict)
 
     return jsonify(all_prcp)
 
@@ -75,14 +76,42 @@ def stations():
 def tobs():
     session = Session(engine)
 
-    results = session.query(Passenger.name).all()
+    query_date = dt.date(2017, 8, 23) - dt.timedelta(days=365)
+
+    results = session.query(Measurement.date, Measurement.tobs).filter(Measurement.date >= query_date).all()
 
     session.close()
 
-    all_names = list(np.ravel(results))
+    date_tobs = list(np.ravel(results))
 
-    return jsonify(all_names)
+    return jsonify(date_tobs)
 
+
+@app.route("/api/v1.0/<startdate>")
+def start_input(startdate):
+    session = Session(engine)
+
+    results = session.query(func.min(Measurement.tobs), func.max(Measurement.tobs), func.avg(Measurement.tobs)).\
+        filter(Measurement.date >= startdate).all()
+    
+    session.close()
+
+    date_stat = list(np.ravel(results))
+
+    return jsonify(date_stat)
+
+@app.route("/api/v1.0/<startdate><enddate>")
+def start_end_input(startdate, enddate):
+    session = Session(engine)
+
+    results = session.query(func.min(Measurement.tobs), func.max(Measurement.tobs), func.avg(Measurement.tobs)).\
+        filter(Measurement.date >= startdate, Measurement.date <= enddate).all()
+    
+    session.close()
+
+    dates_stat = list(np.ravel(results))
+
+    return jsonify(dates_stat)
 
 if __name__ == '__main__':
     app.run(debug=True)
